@@ -250,9 +250,9 @@ if __name__ == "__main__":
     while True:
         print("\n\033[95m" + "="*34)
         if has_figlet:
-            print(Figlet(font='slant').renderText("YouTube DL"))
+            print(Figlet(font='slant').renderText("Leshoraa"))
         else:
-            print("       🎥 YouTube Downloader       ")
+            print("       📹 YouTube Downloader       ")
         print("="*34 + "\033[0m")
 
         raw = input("\n📋 Paste URL or search video: ").strip()
