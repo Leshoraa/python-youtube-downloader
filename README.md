@@ -15,20 +15,16 @@ A terminal-based YouTube downloader built using `yt-dlp`, designed specifically 
 
 ## Prerequisites
 
-Before running, make sure you have the following installed:
-
 ### For Termux (Android)
 
-Run this setup script to install all dependencies:
+Make sure you have Termux and Termux:API installed (from F-Droid or GitHub). Then run this setup script to install all dependencies:
 
 ```bash
 pkg update && pkg upgrade -y
-pkg install -y python ffmpeg wget curl termux-api jp2a
+pkg install -y python ffmpeg wget curl termux-api jp2a git
 pip install --upgrade pip
 pip install yt-dlp colorama pyfiglet Pillow
 ```
-
-> Make sure `termux-api` and `termux-api` app are installed from F-Droid or GitHub.
 
 ### For Windows (CMD)
 
@@ -43,17 +39,30 @@ pip install yt-dlp colorama pyfiglet Pillow
 
 ## How to Use
 
-Simply run the script:
+### Clone the Repository
+
+In Termux:
 
 ```bash
-python youtube_dl_script.py
+git clone https://github.com/Leshoraa/python-youtube-downloader.git
+cd python-youtube-downloader
+python yt_downloader.py
 ```
 
-You can either:
-- Paste a YouTube URL directly
-- Type a keyword to search and select from results
+Or in CMD (Windows):
 
-Then:
-- Choose download mode: Video, Audio, or Both
-- Pick the quality/resolution
-- Your file will be saved in `~/storage/downloads/YtVideo` or `/sdcard/Download/YtVideo`
+```bash
+git clone https://github.com/Leshoraa/python-youtube-downloader.git
+cd python-youtube-downloader
+python yt_downloader.py
+```
+
+### Usage Flow
+
+1. Paste a YouTube URL or search with keywords
+2. Choose:
+   - Download mode: Video, Audio, or Both
+   - Preferred quality/resolution
+3. The file will be saved to:
+   - `~/storage/downloads/YtVideo` (Android Termux)
+   - or `/sdcard/Download/YtVideo` (Termux without storage binding)
