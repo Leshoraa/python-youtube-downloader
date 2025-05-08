@@ -66,3 +66,4 @@ python yt_downloader.py
 3. The file will be saved to:
    - `~/storage/downloads/YtVideo` (Android Termux)
    - or `/sdcard/Download/YtVideo` (Termux without storage binding)
+   - `C:\Users\YourName\Downloads\YtVideo` (PC)
