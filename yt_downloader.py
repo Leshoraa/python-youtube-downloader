@@ -120,7 +120,7 @@ def download(url, format_id, output_path, is_audio):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
-def truncate(text, max_words=7):
+def truncate(text, max_words=8):
     words = text.split()
     if len(words) > max_words:
         return " ".join(words[:max_words]) + "..."
