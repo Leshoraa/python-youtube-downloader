@@ -4,6 +4,7 @@ import re
 import sys
 import time
 import shutil
+import difflib
 import urllib.request
 from colorama import Fore, Style
 
@@ -120,69 +121,100 @@ def download(url, format_id, output_path, is_audio):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
-def truncate(text, max_words=8):
-    words = text.split()
-    if len(words) > max_words:
-        return " ".join(words[:max_words]) + "..."
-    return text
+def truncate(text, max_length=50):
+    return text if len(text) <= max_length else text[:max_length - 3] + "..."
 
 def search_video(query):
-    ydl_opts = {
-        "quiet": True,
-        "extract_flat": True,
-    }
-
+    ydl_opts = {"quiet": True, "extract_flat": True}
     ydl = yt_dlp.YoutubeDL(ydl_opts)
     offset = 0
     per_page = 10
     page = 1
-    history = []
+    last_lines = 0
+    all_results = []
 
     while True:
-        info = ydl.extract_info(f"ytsearch{per_page}:{query} {offset}", download=False)
-        results = info.get("entries", [])
-        if not results:
-            print("\n❌ No results found!")
-            return None
+        if offset == 0:
+            info = ydl.extract_info(f"ytsearch{per_page * 5}:{query}", download=False)
+            all_results = info.get("entries", [])
+            if not all_results:
+                print("\n❌ No results found!")
+                return None
 
-        history.append(results)
-        print(f"\n📄 {Fore.CYAN}Page {page}{Style.RESET_ALL} — Results for: '{query}'\n")
+            for entry in all_results:
+                title = entry.get("title", "").lower()
+                query_lower = query.lower()
+                title_similarity = difflib.SequenceMatcher(None, query_lower, title).ratio() * 100
+                view_count = entry.get("view_count", 0)
+                view_score = 100 if view_count >= 1_000_000 else 75 if view_count >= 100_000 else 50 if view_count >= 10_000 else 25
+                duration = entry.get("duration", 0)
+                duration_score = 100 if duration >= 600 else 75 if duration >= 180 else 50 if duration >= 60 else 25
+                entry["relevance_score"] = (0.6 * title_similarity) + (0.3 * view_score) + (0.1 * duration_score)
+
+            all_results = sorted(
+                all_results,
+                key=lambda x: (-x.get("view_count", 0))
+            )
+
+        results = all_results[offset:offset + per_page]
+
+        if last_lines > 0:
+            sys.stdout.write(f"\033[{last_lines}A\033[J")
+
+        header = f"\n{Fore.CYAN}📄 Page {page}{Style.RESET_ALL} — Results for: '{query}'\n"
+        print(header)
+        total_lines = header.count('\n') + 1
 
         for i, entry in enumerate(results):
             num = offset + i + 1
-            title = truncate(entry.get("title", "Unknown"))
+            title = (entry.get("title", "Unknown"))[:50] + "..." if len(entry.get("title", "")) > 50 else entry.get("title", "Unknown")
             channel = entry.get("channel", "Unknown")
             duration = time.strftime('%M:%S', time.gmtime(entry.get("duration", 0)))
+            view_count = entry.get("view_count", 0)
+            relevance_score = entry.get("relevance_score", 0)
+
+            def shorten_views(count):
+                if count >= 1_000_000_000:
+                    return f"{count/1_000_000_000:.1f}B"
+                elif count >= 1_000_000:
+                    return f"{count/1_000_000:.1f}M"
+                elif count >= 1_000:
+                    return f"{count/1_000:.1f}K"
+                else:
+                    return str(count)
+
+            views_str = shorten_views(view_count)
 
             print(f"""{Fore.GREEN}┌─{Fore.WHITE} {num}. {title}
-{Fore.GREEN}│   {Fore.YELLOW}• {channel}{Style.RESET_ALL}  |  {Fore.MAGENTA}{duration}{Style.RESET_ALL}
+{Fore.GREEN}│   {Fore.YELLOW}• {channel}{Style.RESET_ALL}  |  {Fore.MAGENTA}{duration}{Style.RESET_ALL}  |  {Fore.CYAN}{views_str}{Style.RESET_ALL}
 {Fore.GREEN}└────────────────────────────{Style.RESET_ALL}""")
+            total_lines += 3
 
-        prompt = "\n🔢 Choose a number"
+        prompt = "🔢 Choose a number"
         if offset >= per_page:
             prompt += ", 'p' for previous"
-        if len(results) == per_page:
+        if offset + per_page < len(all_results):
             prompt += ", 'n' for next"
         prompt += ": "
 
+        print()
         sel = input(prompt).strip().lower()
-        if sel == 'n' and len(results) == per_page:
+        last_lines = total_lines + 2
+
+        if sel == 'n' and offset + per_page < len(all_results):
             offset += per_page
             page += 1
             continue
         elif sel == 'p' and offset >= per_page:
             offset -= per_page
             page -= 1
-            history.pop()
             continue
         try:
             sel_int = int(sel)
             if offset < sel_int <= offset + len(results):
-                return results[sel_int - offset - 1].get("url", "")
-            else:
-                print("❌ Invalid number for this page.")
-        except:
-            print("❌ Invalid input.")
+                return results[sel_int - offset - 1].get("url")
+        except ValueError:
+            pass
 
 def list_resolutions(url, is_audio):
     ydl = yt_dlp.YoutubeDL({"quiet": True})
@@ -201,11 +233,6 @@ def list_resolutions(url, is_audio):
             print("❌ Invalid selection!")
             return None, []
 
-    print(f"\n🎬 Title: \033[96m{info.get('title', 'Unknown')}\033[0m\n")
-    thumbnail_url = info.get("thumbnail")
-    if thumbnail_url:
-        display_ascii_thumbnail(thumbnail_url)
-
     formats = info.get('formats', [])
     listed = []
 
@@ -213,7 +240,7 @@ def list_resolutions(url, is_audio):
         audio_formats = [f for f in formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none' and f.get('filesize')]
         printed = set()
         sorted_audio_formats = sorted(audio_formats, key=lambda x: (x.get('abr', 0), x.get('filesize', 0)), reverse=True)
-        print("🎵 Available Audio Qualities:")
+        print("\n🎵 Available Audio Qualities:\n")
         index = 1
         for fmt in sorted_audio_formats:
             abr = fmt.get('abr', 0)
@@ -230,7 +257,7 @@ def list_resolutions(url, is_audio):
         video_formats = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') == 'none' and f.get('filesize')]
         printed_res = set()
         sorted_video_formats = sorted(video_formats, key=lambda x: x.get('height', 0), reverse=True)
-        print("📐 Available Video Resolutions:")
+        print("\n📐 Available Video Resolutions:\n")
         index = 1
         for fmt in sorted_video_formats:
             height = fmt.get('height', 0)
@@ -248,13 +275,10 @@ def list_resolutions(url, is_audio):
 
 if __name__ == "__main__":
     while True:
-        print("\n\033[95m" + "="*34)
-        if has_figlet:
-            print(Figlet(font='slant').renderText("Leshoraa"))
-        else:
-            print("       📹 YouTube Downloader       ")
-        print("="*34 + "\033[0m")
-
+        print("\n\033[95m" + "=" * 34)
+        print("       📹 YouTube Downloader       ")
+        print("=" * 34 + "\033[0m")
+    
         raw = input("\n📋 Paste URL or search video: ").strip()
         if not raw:
             continue
@@ -262,12 +286,31 @@ if __name__ == "__main__":
             raw = search_video(raw)
             if not raw:
                 continue
-
-        mode = input("\n🎵 Choose mode:\n1. Video 🎞️\n2. Audio 🎧\n3. Video & Audio 🔄\n➤ Choice (1/2/3): ").strip()
+    
+        ydl = yt_dlp.YoutubeDL({"quiet": True})
+        info = ydl.extract_info(raw, download=False)
+        thumbnail_url = info.get("thumbnail")
+        if thumbnail_url:
+            print()
+            display_ascii_thumbnail(thumbnail_url)
+        print(f"\n🎬 Title: \033[96m{info.get('title', 'Unknown')}\033[0m\n")
+    
+        mode = input(
+            "🎵 Choose mode:\n\n"
+            "1. Video 🎞️\n"
+            "2. Audio 🎧\n"
+            "3. Video & Audio 🔄\n"
+            "4. Cancel ❌\n\n"
+            "➤ Choice (1/2/3/4): "
+        ).strip()
+    
+        if mode == '4':
+            continue
+    
         if mode not in ['1', '2', '3']:
             print("❌ Invalid choice!")
             continue
-
+    
         is_audio = mode == '2'
         result = list_resolutions(raw, is_audio if mode != '3' else False)
         if not result:
@@ -275,7 +318,7 @@ if __name__ == "__main__":
         title, formats = result
         if not formats:
             continue
-
+    
         choice = input("\n🎯 Select video number: ").strip()
         try:
             idx = int(choice) - 1
@@ -283,11 +326,11 @@ if __name__ == "__main__":
         except:
             print("❌ Invalid video selection!")
             continue
-
+    
         download_dir = get_download_dir()
         os.makedirs(download_dir, exist_ok=True)
         safe_title = sanitize_filename(title)
-
+    
         if mode == '3':
             print("\n🔎 Fetching audio quality list...")
             _, audio_formats = list_resolutions(raw, True)
@@ -301,30 +344,30 @@ if __name__ == "__main__":
             except:
                 print("❌ Invalid audio selection!")
                 continue
-
+    
             video_file = os.path.join(download_dir, safe_title + "_video.mp4")
             audio_file = os.path.join(download_dir, safe_title + "_audio.mp3")
-
+    
             print(f"\n🚀 Downloading video to: \033[92m{video_file}\033[0m")
             download(raw, selected_format_id, video_file, False)
             log_download(title, label + " (video)", size_mb, video_file)
-
+    
             print(f"\n🎧 Downloading audio to: \033[92m{audio_file}\033[0m")
             download(raw, audio_format_id, audio_file, True)
             log_download(title, audio_label + " (audio)", audio_size, audio_file)
-
+    
         elif mode == '1':
             output_file = os.path.join(download_dir, safe_title + ".mp4")
             print(f"\n🚀 Saving to: \033[92m{output_file}\033[0m")
             download(raw, selected_format_id, output_file, False)
             log_download(title, label, size_mb, output_file)
-
+    
         elif mode == '2':
             output_file = os.path.join(download_dir, safe_title + ".mp3")
             print(f"\n🚀 Saving to: \033[92m{output_file}\033[0m")
             download(raw, selected_format_id, output_file, True)
             log_download(title, label, size_mb, output_file)
-
+    
         again = input("\n🔁 Download again? (y/n): ").lower().strip()
         if again != 'y':
             print("\n👋 Goodbye!")
