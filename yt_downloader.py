@@ -18,13 +18,18 @@ def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\0-\x1f]', "", filename).strip().lstrip(".")
 
 def get_download_dir():
-    base_dir = "/storage/emulated/0/Download"
-    target_dir = os.path.join(base_dir, "YtVideo")
-    if not os.path.exists(base_dir):
-        if "com.termux" in os.environ.get('PREFIX', ''):
-            target_dir = os.path.join("/sdcard/Download", "YtVideo")
-        else:
-            target_dir = os.path.join(os.getcwd(), "YtVideo")
+    if sys.platform.startswith("linux"):
+        base_dir = "/storage/emulated/0/Download"
+        target_dir = os.path.join(base_dir, "YtVideo")
+        if not os.path.exists(base_dir):
+            if "com.termux" in os.environ.get('PREFIX', ''):
+                target_dir = os.path.join("/sdcard/Download", "YtVideo")
+            else:
+                target_dir = os.path.join(os.getcwd(), "YtVideo")
+    elif sys.platform.startswith("win"):
+        target_dir = os.path.join(os.path.expanduser("~"), "Downloads", "YtVideo")
+    else:
+        target_dir = os.path.join(os.getcwd(), "YtVideo")
     return target_dir
 
 def download_speed(bytes_per_sec):
@@ -49,25 +54,29 @@ def log_download(title, format_label, size_mb, output_file):
 
 def notify_done():
     try:
-        if sys.platform.startswith("linux") and shutil.which("termux-toast"):
-            os.system('termux-toast -g bottom -b green "✅ Download Complete!"')
-        if shutil.which("termux-vibrate"):
-            os.system('termux-vibrate -d 100')
-        if shutil.which("termux-media-player"):
-            os.system('termux-media-player play /system/media/audio/ui/Effect_Tick.ogg')
+        if sys.platform.startswith("linux"):
+            if shutil.which("termux-toast"):
+                os.system('termux-toast -g bottom -b green "✅ Download Complete!"')
+            if shutil.which("termux-vibrate"):
+                os.system('termux-vibrate -d 100')
+            if shutil.which("termux-media-player"):
+                os.system('termux-media-player play /system/media/audio/ui/Effect_Tick.ogg')
+            else:
+                print('\a', end='')  # Fallback beep
+        elif sys.platform.startswith("win"):
+            import winsound
+            winsound.Beep(1000, 300)  # Beep sound for Windows
         else:
-            print('\a', end='')
+            print('\a', end='')  # Fallback beep
     except:
-        print('\a', end='')
+        print('\a', end='')  # Fallback beep
 
 def display_ascii_thumbnail(thumbnail_url):
     temp_image = os.path.join(os.path.expanduser("~"), ".cache", "yt_thumb.jpg")
     try:
         os.makedirs(os.path.dirname(temp_image), exist_ok=True)
         urllib.request.urlretrieve(thumbnail_url, temp_image)
-        if shutil.which("termux-image-viewer"):
-            os.system(f"termux-image-viewer {temp_image} 2>/dev/null &")
-        elif shutil.which("jp2a"):
+        if sys.platform.startswith("linux") and shutil.which("jp2a"):
             os.system(f"jp2a --width=40 --colors --fill {temp_image}")
         else:
             from PIL import Image
