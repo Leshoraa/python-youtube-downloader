@@ -52,7 +52,7 @@ def log_download(title, format_label, size_mb, output_file):
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         f.write(f"[{timestamp}] {title} - {format_label} - {size_mb:.2f} MB - {output_file}\n")
 
-def notify_doness():
+def notify_done():
     try:
         if sys.platform.startswith("linux"):
             if shutil.which("termux-toast"):
