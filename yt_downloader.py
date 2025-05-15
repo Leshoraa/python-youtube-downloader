@@ -279,8 +279,9 @@ def list_resolutions(url, is_audio):
     else:
         video_formats = [
             f for f in formats 
-            if f.get('vcodec') != 'none' and f.get('acodec') != 'none' and f.get('filesize')
+            if f.get('vcodec') != 'none' and f.get('filesize')
         ]
+
 
         printed_res = set()
         sorted_video_formats = sorted(video_formats, key=lambda x: x.get('height', 0), reverse=True)
