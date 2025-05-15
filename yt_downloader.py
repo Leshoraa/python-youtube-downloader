@@ -131,6 +131,12 @@ def download(url, format_id, output_path, is_audio):
                 'key': 'FFmpegVideoConvertor',
                 'preferedformat': 'mp4',
             }
+        ] if not is_audio else [
+            {
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }
         ],
     }
 
