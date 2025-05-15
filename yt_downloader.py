@@ -121,7 +121,7 @@ def download(url, format_id, output_path, is_audio):
             notify_done()
 
     ydl_opts = {
-        'format': f'{selected_format_id}+bestaudio/best',
+        'format': format_id,
         'outtmpl': f'{title}.%(ext)s',
         'merge_output_format': 'mp4',
         'postprocessors': [
