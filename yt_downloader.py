@@ -19,13 +19,14 @@ def sanitize_filename(filename):
 
 def get_download_dir():
     if sys.platform.startswith("linux"):
-        base_dir = "/storage/emulated/0/Download"
-        target_dir = os.path.join(base_dir, "YtVideo")
-        if not os.path.exists(base_dir):
-            if "com.termux" in os.environ.get('PREFIX', ''):
-                target_dir = os.path.join("/sdcard/Download", "YtVideo")
-            else:
-                target_dir = os.path.join(os.getcwd(), "YtVideo")
+        # Deteksi jika di Termux (PREFIX khas Termux)
+        if "com.termux" in os.environ.get('PREFIX', ''):
+            base_dir = "/data/data/com.termux/files/home/storage/downloads"
+            target_dir = os.path.join(base_dir, "YtVideo")
+        elif os.path.exists("/sdcard/Download"):
+            target_dir = os.path.join("/sdcard/Download", "YtVideo")
+        else:
+            target_dir = os.path.join(os.getcwd(), "YtVideo")
     elif sys.platform.startswith("win"):
         target_dir = os.path.join(os.path.expanduser("~"), "Downloads", "YtVideo")
     else:
@@ -64,12 +65,19 @@ def notify_done():
             else:
                 print('\a', end='')  # Fallback beep
         elif sys.platform.startswith("win"):
-            import winsound
-            winsound.Beep(1000, 300)  # Beep sound for Windows
+            try:
+                import winsound
+                winsound.Beep(1000, 300)
+            except:
+                try:
+                    from playsound import playsound
+                    playsound("C:\\Windows\\Media\\notify.wav")
+                except:
+                    print('\a', end='')
         else:
-            print('\a', end='')  # Fallback beep
+            print('\a', end='')
     except:
-        print('\a', end='')  # Fallback beep
+        print('\a', end='')
 
 def display_ascii_thumbnail(thumbnail_url):
     temp_image = os.path.join(os.path.expanduser("~"), ".cache", "yt_thumb.jpg")
@@ -79,19 +87,22 @@ def display_ascii_thumbnail(thumbnail_url):
         if sys.platform.startswith("linux") and shutil.which("jp2a"):
             os.system(f"jp2a --width=40 --colors --fill {temp_image}")
         else:
-            from PIL import Image
-            img = Image.open(temp_image)
-            img = img.resize((40, 20))
-            img = img.convert("L")
-            pixels = img.getdata()
-            chars = [" ", "░", "▒", "▓", "█"]
-            ascii_img = ""
-            for i in range(0, len(pixels), img.width):
-                line = pixels[i:i+img.width]
-                ascii_img += "".join([chars[min(p//51, 4)] for p in line]) + "\n"
-            print(ascii_img)
+            try:
+                from PIL import Image
+                img = Image.open(temp_image)
+                img = img.resize((40, 20))
+                img = img.convert("L")
+                pixels = img.getdata()
+                chars = [" ", "░", "▒", "▓", "█"]
+                ascii_img = ""
+                for i in range(0, len(pixels), img.width):
+                    line = pixels[i:i+img.width]
+                    ascii_img += "".join([chars[min(p//51, 4)] for p in line]) + "\n"
+                print(ascii_img)
+            except:
+                print("🖼️ Thumbnail downloaded (no display support)")
     except:
-        print("🖼️ Thumbnail available (install jp2a for better display)")
+        print("🖼️ Thumbnail available (install jp2a or pillow for preview)")
 
 def download(url, format_id, output_path, is_audio):
     def hook(d):
@@ -168,7 +179,10 @@ def search_video(query):
         results = all_results[offset:offset + per_page]
 
         if last_lines > 0:
-            sys.stdout.write(f"\033[{last_lines}A\033[J")
+            if sys.platform.startswith("win"):
+                os.system('cls')
+            else:
+                os.system('clear')
 
         header = f"\n{Fore.CYAN}📄 Page {page}{Style.RESET_ALL} — Results for: '{query}'\n"
         print(header)
