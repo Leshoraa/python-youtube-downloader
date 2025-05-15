@@ -124,7 +124,6 @@ def download(url, format_id, output_path, is_audio):
         'format': format_id,
         'outtmpl': output_path,
         'progress_hooks': [hook],
-        'quiet': True,
         'no_warnings': True,
 
 
@@ -148,7 +147,10 @@ def download(url, format_id, output_path, is_audio):
     class QuietLogger:
         def debug(self, msg): pass
         def warning(self, msg): pass
+        def info(self, msg):
+            print(msg)
         def error(self, msg): print(msg)
+
 
     ydl_opts['logger'] = QuietLogger()
 
