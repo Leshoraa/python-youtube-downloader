@@ -83,12 +83,8 @@ def display_ascii_thumbnail(url):
     except:
         print("🖼️ Thumbnail available (install jp2a or pillow for preview)")
 
-def merge_video_audio(video_path, audio_path, output_path):
-    cmd = [
-        'ffmpeg', '-i', video_path, '-i', audio_path,
-        '-c:v', 'copy', '-c:a', 'aac', '-strict', 'experimental', output_path
-    ]
-    subprocess.run(cmd)
+def merging_hook():
+    print("[🔄] Merging in progress...")  # Placeholder
 
 def download(url, format_id, path, is_audio, download_type=""):
     def hook(d):
@@ -102,7 +98,7 @@ def download(url, format_id, path, is_audio, download_type=""):
         elif d['status'] == 'finished':
             print_colored_progress_bar(100, "Done ✓")
             if download_type == 'merge':
-                merging_hook()  # Call merge progress if merging
+                merging_hook()  # Call merge progress jika merging
             print(f"\n✅ {'Merged video & audio' if download_type=='merge' else 'Audio download' if download_type=='audio' else 'Video downloaded'} complete!")
             notify_done()
 
@@ -111,9 +107,6 @@ def download(url, format_id, path, is_audio, download_type=""):
         'outtmpl': path,
         'progress_hooks': [hook],
         'no_warnings': True,
-        'merge_output_format': 'mp4',  # Tambahkan ini
-        'external_downloader': 'aria2c',  # Gunakan aria2c untuk lebih cepat
-        'external_downloader_args': ['-x', '16', '-k', '1M'],  # 16 koneksi paralel
         'logger': type('Logger', (), {'debug': lambda *_: None, 'warning': lambda *_: None, 'info': print, 'error': print})()
     }
 
