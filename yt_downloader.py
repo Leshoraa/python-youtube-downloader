@@ -1,5 +1,13 @@
-import yt_dlp, os, re, sys, time, shutil, difflib, urllib.request
+import yt_dlp
+import os
+import re
+import sys
+import time
+import shutil
+import difflib
+import urllib.request
 from colorama import Fore, Style
+
 try:
     from pyfiglet import Figlet
     has_figlet = True
@@ -11,29 +19,39 @@ def sanitize_filename(filename):
 
 def get_download_dir():
     if sys.platform.startswith("linux"):
+        # Deteksi jika di Termux (PREFIX khas Termux)
         if "com.termux" in os.environ.get('PREFIX', ''):
             base_dir = "/data/data/com.termux/files/home/storage/downloads"
-            return os.path.join(base_dir, "YtVideo")
+            target_dir = os.path.join(base_dir, "YtVideo")
         elif os.path.exists("/sdcard/Download"):
-            return os.path.join("/sdcard/Download", "YtVideo")
+            target_dir = os.path.join("/sdcard/Download", "YtVideo")
+        else:
+            target_dir = os.path.join(os.getcwd(), "YtVideo")
     elif sys.platform.startswith("win"):
-        return os.path.join(os.path.expanduser("~"), "Downloads", "YtVideo")
-    return os.path.join(os.getcwd(), "YtVideo")
+        target_dir = os.path.join(os.path.expanduser("~"), "Downloads", "YtVideo")
+    else:
+        target_dir = os.path.join(os.getcwd(), "YtVideo")
+    return target_dir
 
-def download_speed(bps):
-    return f"{bps/1024/1024:.2f}MB/s" if bps >= 1024*1024 else f"{bps/1024:.1f}KB/s"
+def download_speed(bytes_per_sec):
+    if not bytes_per_sec:
+        return ""
+    mb = bytes_per_sec / 1024 / 1024
+    return f"{mb:.2f}MB/s" if mb >= 1 else f"{bytes_per_sec/1024:.1f}KB/s"
 
-def print_colored_progress_bar(percent, info, width=20):
+def print_colored_progress_bar(percent, info_str, width=20):
     filled = int(width * percent // 100)
+    empty = width - filled
     color = "\033[91m" if percent < 30 else "\033[93m" if percent < 70 else "\033[92m"
-    bar = "█" * filled + "░" * (width - filled)
-    sys.stdout.write(f"\r{color}[{bar}] {percent:5.1f}% | {info}\033[0m")
+    bar = "█" * filled + "░" * empty
+    sys.stdout.write(f"\r{color}[{bar}] {percent:5.1f}% | {info_str}\033[0m")
     sys.stdout.flush()
 
 def log_download(title, format_label, size_mb, output_file):
-    path = os.path.join(get_download_dir(), "download_history.log")
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {title} - {format_label} - {size_mb:.2f} MB - {output_file}\n")
+    log_path = os.path.join(get_download_dir(), "download_history.log")
+    with open(log_path, "a", encoding="utf-8") as f:
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"[{timestamp}] {title} - {format_label} - {size_mb:.2f} MB - {output_file}\n")
 
 def notify_done():
     try:
@@ -45,7 +63,7 @@ def notify_done():
             if shutil.which("termux-media-player"):
                 os.system('termux-media-player play /system/media/audio/ui/Effect_Tick.ogg')
             else:
-                print('\a', end='')
+                print('\a', end='')  # Fallback beep
         elif sys.platform.startswith("win"):
             try:
                 import winsound
@@ -61,66 +79,101 @@ def notify_done():
     except:
         print('\a', end='')
 
-def display_ascii_thumbnail(url):
-    temp = os.path.join(os.path.expanduser("~"), ".cache", "yt_thumb.jpg")
+def display_ascii_thumbnail(thumbnail_url):
+    temp_image = os.path.join(os.path.expanduser("~"), ".cache", "yt_thumb.jpg")
     try:
-        os.makedirs(os.path.dirname(temp), exist_ok=True)
-        urllib.request.urlretrieve(url, temp)
+        os.makedirs(os.path.dirname(temp_image), exist_ok=True)
+        urllib.request.urlretrieve(thumbnail_url, temp_image)
         if sys.platform.startswith("linux") and shutil.which("jp2a"):
-            os.system(f"jp2a --width=40 --colors --fill {temp}")
+            os.system(f"jp2a --width=40 --colors --fill {temp_image}")
         else:
             try:
                 from PIL import Image
-                img = Image.open(temp).resize((40, 20)).convert("L")
+                img = Image.open(temp_image)
+                img = img.resize((40, 20))
+                img = img.convert("L")
                 pixels = img.getdata()
                 chars = [" ", "░", "▒", "▓", "█"]
                 ascii_img = ""
                 for i in range(0, len(pixels), img.width):
-                    ascii_img += "".join([chars[min(p//51, 4)] for p in pixels[i:i+img.width]]) + "\n"
+                    line = pixels[i:i+img.width]
+                    ascii_img += "".join([chars[min(p//51, 4)] for p in line]) + "\n"
                 print(ascii_img)
             except:
                 print("🖼️ Thumbnail downloaded (no display support)")
     except:
         print("🖼️ Thumbnail available (install jp2a or pillow for preview)")
 
-def download(url, format_id, path, is_audio, download_type=""):
+def download(url, format_id, output_path, is_audio, download_type=""):
     def hook(d):
         if d['status'] == 'downloading':
             total = d.get('total_bytes') or d.get('total_bytes_estimate', 1)
-            percent = d.get('downloaded_bytes', 0) * 100 / total
-            speed = download_speed(d.get('speed', 0))
+            downloaded = d.get('downloaded_bytes', 0)
+            speed = d.get('speed', 0)
             eta = d.get('eta', 0)
+            percent = downloaded * 100 / total
+            speed_str = download_speed(speed)
             eta_str = f"{eta//60:02}:{eta%60:02}" if eta else "--:--"
-            print_colored_progress_bar(percent, f"{speed} | ETA {eta_str}")
+            print_colored_progress_bar(percent, f"{speed_str} | ETA {eta_str}")
         elif d['status'] == 'finished':
             print_colored_progress_bar(100, "Done ✓")
-            if download_type == 'merge':
-                merging_hook()  # Call merge progress if merging
-            print(f"\n✅ {'Merged video & audio' if download_type=='merge' else 'Audio download' if download_type=='audio' else 'Video downloaded'} complete!")
+            if download_type == "audio":
+                print("\n✅ Audio download complete!")
+            elif download_type == "video":
+                print("\n✅ Video downloaded")
+            elif download_type == "merge":
+                print("\n✅ Merged video & audio complete!")
+            else:
+                print("\n✅ Download complete!")
             notify_done()
 
-    opts = {
+    ydl_opts = {
         'format': format_id,
-        'outtmpl': path,
+        'outtmpl': output_path,
         'progress_hooks': [hook],
         'no_warnings': True,
-        'logger': type('Logger', (), {'debug': lambda *_: None, 'warning': lambda *_: None, 'info': print, 'error': print})()
+
+
     }
 
     if is_audio:
-        opts.update({'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3'}], 'extractaudio': True, 'keepvideo': False})
+        ydl_opts['format'] = format_id
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+        }]
+        ydl_opts['extractaudio'] = True
+        ydl_opts['keepvideo'] = False
     else:
-        opts['postprocessors'] = [{'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'}]
+        ydl_opts['format'] = format_id
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }]
 
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    class QuietLogger:
+        def debug(self, msg): pass
+        def warning(self, msg): pass
+        def info(self, msg):
+            print(msg)
+        def error(self, msg): print(msg)
+
+
+    ydl_opts['logger'] = QuietLogger()
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
-def truncate(text, max_len=50):
-    return text if len(text) <= max_len else text[:max_len - 3] + "..."
+def truncate(text, max_length=50):
+    return text if len(text) <= max_length else text[:max_length - 3] + "..."
 
 def search_video(query):
-    ydl = yt_dlp.YoutubeDL({"quiet": True, "extract_flat": True})
-    offset, per_page, page, last_lines = 0, 10, 1, 0
+    ydl_opts = {"quiet": True, "extract_flat": True}
+    ydl = yt_dlp.YoutubeDL(ydl_opts)
+    offset = 0
+    per_page = 10
+    page = 1
+    last_lines = 0
     all_results = []
 
     while True:
@@ -130,42 +183,83 @@ def search_video(query):
             if not all_results:
                 print("\n❌ No results found!")
                 return None
-            for e in all_results:
-                ts = difflib.SequenceMatcher(None, query.lower(), e.get("title", "").lower()).ratio() * 100
-                vs = 100 if e.get("view_count", 0) >= 1_000_000 else 75 if e.get("view_count", 0) >= 100_000 else 50 if e.get("view_count", 0) >= 10_000 else 25
-                ds = 100 if e.get("duration", 0) >= 600 else 75 if e.get("duration", 0) >= 180 else 50 if e.get("duration", 0) >= 60 else 25
-                e["relevance_score"] = 0.6 * ts + 0.3 * vs + 0.1 * ds
-            all_results.sort(key=lambda x: -x.get("view_count", 0))
+
+            for entry in all_results:
+                title = entry.get("title", "").lower()
+                query_lower = query.lower()
+                title_similarity = difflib.SequenceMatcher(None, query_lower, title).ratio() * 100
+                view_count = entry.get("view_count", 0)
+                view_score = 100 if view_count >= 1_000_000 else 75 if view_count >= 100_000 else 50 if view_count >= 10_000 else 25
+                duration = entry.get("duration", 0)
+                duration_score = 100 if duration >= 600 else 75 if duration >= 180 else 50 if duration >= 60 else 25
+                entry["relevance_score"] = (0.6 * title_similarity) + (0.3 * view_score) + (0.1 * duration_score)
+
+            all_results = sorted(
+                all_results,
+                key=lambda x: (-x.get("view_count", 0))
+            )
 
         results = all_results[offset:offset + per_page]
 
         if last_lines > 0:
-            os.system('cls' if sys.platform.startswith("win") else 'clear')
+            if sys.platform.startswith("win"):
+                os.system('cls')
+            else:
+                os.system('clear')
 
-        print(f"\n{Fore.CYAN}📄 Page {page}{Style.RESET_ALL} — Results for: '{query}'\n")
-        for i, e in enumerate(results):
-            n = offset + i + 1
-            title = (e.get("title", "")[:50] + "...") if len(e.get("title", "")) > 50 else e.get("title", "")
-            channel = e.get("channel", "Unknown")
-            duration = time.strftime('%M:%S', time.gmtime(e.get("duration", 0)))
-            vc = e.get("view_count", 0)
-            views = f"{vc/1_000_000_000:.1f}B" if vc >= 1_000_000_000 else f"{vc/1_000_000:.1f}M" if vc >= 1_000_000 else f"{vc/1_000:.1f}K" if vc >= 1_000 else str(vc)
-            print(f"""{Fore.GREEN}┌─{Fore.WHITE} {n}. {title}
-{Fore.GREEN}│   {Fore.YELLOW}• {channel}{Style.RESET_ALL}  |  {Fore.MAGENTA}{duration}{Style.RESET_ALL}  |  {Fore.CYAN}{views}{Style.RESET_ALL}
+        header = f"\n{Fore.CYAN}📄 Page {page}{Style.RESET_ALL} — Results for: '{query}'\n"
+        print(header)
+        total_lines = header.count('\n') + 1
+
+        for i, entry in enumerate(results):
+            num = offset + i + 1
+            title = (entry.get("title", "Unknown"))[:50] + "..." if len(entry.get("title", "")) > 50 else entry.get("title", "Unknown")
+            channel = entry.get("channel", "Unknown")
+            duration = time.strftime('%M:%S', time.gmtime(entry.get("duration", 0)))
+            view_count = entry.get("view_count", 0)
+            relevance_score = entry.get("relevance_score", 0)
+
+            def shorten_views(count):
+                if count >= 1_000_000_000:
+                    return f"{count/1_000_000_000:.1f}B"
+                elif count >= 1_000_000:
+                    return f"{count/1_000_000:.1f}M"
+                elif count >= 1_000:
+                    return f"{count/1_000:.1f}K"
+                else:
+                    return str(count)
+
+            views_str = shorten_views(view_count)
+
+            print(f"""{Fore.GREEN}┌─{Fore.WHITE} {num}. {title}
+{Fore.GREEN}│   {Fore.YELLOW}• {channel}{Style.RESET_ALL}  |  {Fore.MAGENTA}{duration}{Style.RESET_ALL}  |  {Fore.CYAN}{views_str}{Style.RESET_ALL}
 {Fore.GREEN}└────────────────────────────{Style.RESET_ALL}""")
+            total_lines += 3
 
-        sel = input("\n🔢 Choose a number" + (", 'p' for previous" if offset >= per_page else "") + (", 'n' for next" if offset + per_page < len(all_results) else "") + ": ").strip().lower()
-        last_lines = len(results) * 3 + 3
+        prompt = "🔢 Choose a number"
+        if offset >= per_page:
+            prompt += ", 'p' for previous"
+        if offset + per_page < len(all_results):
+            prompt += ", 'n' for next"
+        prompt += ": "
+
+        print()
+        sel = input(prompt).strip().lower()
+        last_lines = total_lines + 2
 
         if sel == 'n' and offset + per_page < len(all_results):
-            offset += per_page; page += 1; continue
+            offset += per_page
+            page += 1
+            continue
         elif sel == 'p' and offset >= per_page:
-            offset -= per_page; page -= 1; continue
+            offset -= per_page
+            page -= 1
+            continue
         try:
             sel_int = int(sel)
             if offset < sel_int <= offset + len(results):
                 return results[sel_int - offset - 1].get("url")
-        except:
+        except ValueError:
             pass
 
 def list_resolutions(url, is_audio):
@@ -175,39 +269,57 @@ def list_resolutions(url, is_audio):
     entries = info.get("entries")
     if entries:
         print("\n📺 Playlist detected!")
-        for i, e in enumerate(entries):
-            print(f"{i+1}. {e.get('title', 'Unknown')}")
+        for i, entry in enumerate(entries):
+            print(f"{i+1}. {entry.get('title', 'Unknown')}")
+        sel = input("\n🔢 Select video number from playlist: ").strip()
         try:
-            info = entries[int(input("\n🔢 Select video number from playlist: ").strip()) - 1]
+            sel = int(sel) - 1
+            info = entries[sel]
         except:
             print("❌ Invalid selection!")
             return None, []
 
-    formats, listed = info.get('formats', []), []
+    formats = info.get('formats', [])
+    listed = []
 
     if is_audio:
-        af = [f for f in formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none' and f.get('filesize')]
+        audio_formats = [f for f in formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none' and f.get('filesize')]
+        printed = set()
+        sorted_audio_formats = sorted(audio_formats, key=lambda x: (x.get('abr', 0), x.get('filesize', 0)), reverse=True)
         print("\n🎵 Available Audio Qualities:\n")
-        printed = set()
-        for i, f in enumerate(sorted(af, key=lambda x: (x.get('abr', 0), x.get('filesize', 0)), reverse=True), 1):
-            k = (f.get('abr', 0), round(f.get('filesize', 0) / 1024 / 1024, 1))
-            if k in printed: continue
-            printed.add(k)
-            label = f"{k[0]:.0f}kbps - {k[1]} MB"
-            print(f"{i}. {label}")
-            listed.append((f['format_id'], label, k[1]))
+        index = 1
+        for fmt in sorted_audio_formats:
+            abr = fmt.get('abr', 0)
+            size = fmt.get('filesize', 0)
+            key = (abr, round(size / 1024 / 1024, 1))
+            if key in printed:
+                continue
+            printed.add(key)
+            label = f"{abr:.0f}kbps - {key[1]} MB"
+            print(f"{index}. {label}")
+            listed.append((fmt['format_id'], label, key[1]))
+            index += 1
     else:
-        vf = [f for f in formats if f.get('vcodec') != 'none' and f.get('filesize')]
+        video_formats = [
+            f for f in formats 
+            if f.get('vcodec') != 'none' and f.get('filesize')
+        ]
+
+        printed_res = set()
+        sorted_video_formats = sorted(video_formats, key=lambda x: x.get('height', 0), reverse=True)
         print("\n📐 Available Video Resolutions:\n")
-        printed = set()
-        for i, f in enumerate(sorted(vf, key=lambda x: x.get('height', 0), reverse=True), 1):
-            h = f.get('height', 0)
-            if h in printed: continue
-            printed.add(h)
-            size = f.get('filesize', 0)
-            label = f"{h}p - {round(size / 1024 / 1024, 1)} MB"
-            print(f"{i}. {label}")
-            listed.append((f"{f.get('format_id')}+bestaudio", label, size / 1024 / 1024))
+        index = 1
+        for fmt in sorted_video_formats:
+            height = fmt.get('height', 0)
+            if height in printed_res:
+                continue
+            printed_res.add(height)
+            size = fmt.get('filesize', 0)
+            fmt_id = fmt.get('format_id')
+            label = f"{height}p - {round(size / 1024 / 1024, 1)} MB"
+            print(f"{index}. {label}")
+            listed.append((f"{fmt_id}+bestaudio", label, size / 1024 / 1024))
+            index += 1
 
     return info.get('title', 'video'), listed
 
