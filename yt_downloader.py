@@ -132,7 +132,7 @@ def download(url, format_id, output_path, is_audio):
         ydl_opts['postprocessors'] = [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',  # Ganti 'aac' jika ingin AAC
-            'preferredquality': '192',  # Bitrate (192 kbps)
+            'cookiesfrombrowser': ('chrome',),
         }]
         ydl_opts['extractaudio'] = True  # Pastikan ekstrak audio
         ydl_opts['keepvideo'] = False    # Hapus file video setelah konversi
