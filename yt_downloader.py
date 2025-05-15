@@ -374,7 +374,7 @@ if __name__ == "__main__":
     
         if mode == '3':
             print("\n🔎 Fetching audio quality list...")
-            _, audio_formats = list_resolutions(raw, True)
+            audio_formats = [f for f in info['formats'] if f.get('vcodec') == 'none' and f.get('acodec') != 'none' and f.get('filesize')]
             if not audio_formats:
                 print("❌ No audio formats available!")
                 continue
