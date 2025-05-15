@@ -94,8 +94,16 @@ def download(url, format_id, path, is_audio, download_type=""):
             print_colored_progress_bar(percent, f"{speed} | ETA {eta_str}")
         elif d['status'] == 'finished':
             print_colored_progress_bar(100, "Done ✓")
-            print(f"\n✅ {'Merged video & audio' if download_type=='merge' else 'Audio download' if download_type=='audio' else 'Video downloaded — merging with audio' if download_type=='video' else 'Download'} complete!")
+            if download_type == 'merge':
+                merging_hook()  # Call merge progress if merging
+            print(f"\n✅ {'Merged video & audio' if download_type=='merge' else 'Audio download' if download_type=='audio' else 'Video downloaded'} complete!")
             notify_done()
+
+    def merging_hook():
+        print("\n🔄 Merging video and audio...")
+        for i in range(0, 101, 10):  # Simulate merging progress
+            time.sleep(0.1)  # Simulate time taken for merging
+            print_colored_progress_bar(i, "Merging...")
 
     opts = {
         'format': format_id,
