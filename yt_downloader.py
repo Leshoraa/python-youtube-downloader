@@ -104,7 +104,6 @@ def display_ascii_thumbnail(thumbnail_url):
     except:
         print("🖼️ Thumbnail available (install jp2a or pillow for preview)")
 
-def download(url, format_id, output_path, is_audio):
 def download(url, format_id, output_path, is_audio, download_type=""):
     def hook(d):
         if d['status'] == 'downloading':
