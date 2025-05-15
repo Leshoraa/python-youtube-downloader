@@ -94,7 +94,7 @@ def display_ascii_thumbnail(thumbnail_url):
         print("🖼️ Thumbnail available (install jp2a for better display)")
 
 def download(url, format_id, output_path, is_audio):
-    def hook(d):
+    def hxook(d):
         if d['status'] == 'downloading':
             total = d.get('total_bytes') or d.get('total_bytes_estimate', 1)
             downloaded = d.get('downloaded_bytes', 0)
