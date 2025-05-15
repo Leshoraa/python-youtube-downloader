@@ -123,35 +123,27 @@ def download(url, format_id, output_path, is_audio):
     ydl_opts = {
         'format': format_id,
         'outtmpl': output_path,
-        'merge_output_format': 'mp4',
         'progress_hooks': [hook],
         'quiet': True,
-        'postprocessors': [
-            {
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4',
-            }
-        ] if not is_audio else [
-            {
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }
-        ],
     }
 
-    if not is_audio:
+    if is_audio:
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }]
+        ydl_opts['extractaudio'] = True  # Ekstrak audio
+        ydl_opts['keepvideo'] = False    # Tidak menyimpan video
+    else:
         ydl_opts['merge_output_format'] = 'mp4'
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }]
 
     class QuietLogger:
         def debug(self, msg): pass
-        def warning(self, msg): pass
-        def error(self, msg): print(msg)
-
-    ydl_opts['logger'] = QuietLogger()
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
 
 def truncate(text, max_length=50):
     return text if len(text) <= max_length else text[:max_length - 3] + "..."
