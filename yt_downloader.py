@@ -121,6 +121,7 @@ def download(url, format_id, output_path, is_audio):
             notify_done()
 
     ydl_opts = {
+        'format': format_id,
         'outtmpl': output_path,
         'progress_hooks': [hook],
         'quiet': True,
