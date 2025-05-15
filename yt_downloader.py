@@ -392,8 +392,9 @@ if __name__ == "__main__":
             print(f"\n🚀 Downloading video to: \033[92m{video_file}\033[0m")
             download(raw, selected_format_id, video_file, False)
             log_download(title, label + " (video)", size_mb, video_file)
-    
+                
             print(f"\n🎧 Downloading audio to: \033[92m{audio_file}\033[0m")
+            print("⏳ Preparing audio download, please wait...")
             download(raw, audio_format_id, audio_file, True)
             log_download(title, audio_label + " (audio)", audio_size, audio_file)
     
