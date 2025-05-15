@@ -83,9 +83,6 @@ def display_ascii_thumbnail(url):
     except:
         print("🖼️ Thumbnail available (install jp2a or pillow for preview)")
 
-def merging_hook():
-    print("[🔄] Merging in progress...")  # Placeholder
-
 def download(url, format_id, path, is_audio, download_type=""):
     def hook(d):
         if d['status'] == 'downloading':
@@ -98,7 +95,7 @@ def download(url, format_id, path, is_audio, download_type=""):
         elif d['status'] == 'finished':
             print_colored_progress_bar(100, "Done ✓")
             if download_type == 'merge':
-                merging_hook()  # Call merge progress jika merging
+                merging_hook()  # Call merge progress if merging
             print(f"\n✅ {'Merged video & audio' if download_type=='merge' else 'Audio download' if download_type=='audio' else 'Video downloaded'} complete!")
             notify_done()
 
