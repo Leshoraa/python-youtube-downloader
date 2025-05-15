@@ -61,7 +61,7 @@ def notify_done():
                 os.system('termux-vibrate -d 100')
             if shutil.which("termux-media-player"):
                 os.system('termux-media-player play /system/media/audio/ui/Effect_Tick.ogg')
-            else:
+            else:;m
                 print('\a', end='')  # Fallback beep
         elif sys.platform.startswith("win"):
             import winsound
