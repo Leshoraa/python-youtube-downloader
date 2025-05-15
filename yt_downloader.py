@@ -121,22 +121,24 @@ def download(url, format_id, output_path, is_audio):
             notify_done()
 
     ydl_opts = {
-        'format': format_id,
         'outtmpl': output_path,
         'progress_hooks': [hook],
         'quiet': True,
     }
 
     if is_audio:
+        # Format terbaik yang tersedia, lalu konversi ke MP3
+        ydl_opts['format'] = 'bestaudio/best'
         ydl_opts['postprocessors'] = [{
             'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
+            'preferredcodec': 'mp3',  # Ganti 'aac' jika ingin AAC
+            'preferredquality': '192',  # Bitrate (192 kbps)
         }]
-        ydl_opts['extractaudio'] = True  # Ekstrak audio
-        ydl_opts['keepvideo'] = False    # Tidak menyimpan video
+        ydl_opts['extractaudio'] = True  # Pastikan ekstrak audio
+        ydl_opts['keepvideo'] = False    # Hapus file video setelah konversi
     else:
-        ydl_opts['merge_output_format'] = 'mp4'
+        # Format video terbaik + konversi ke MP4
+        ydl_opts['format'] = format_id
         ydl_opts['postprocessors'] = [{
             'key': 'FFmpegVideoConvertor',
             'preferedformat': 'mp4',
