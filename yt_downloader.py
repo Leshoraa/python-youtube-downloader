@@ -380,7 +380,10 @@ if __name__ == "__main__":
                 continue
 
             # Sort berdasarkan bitrate
-            sorted_audio = sorted(audio_formats, key=lambda x: (x.get('abr', 0), x.get('filesize', 0) or 0), reverse=True)
+            sorted_audio = sorted(audio_formats, key=lambda x: (
+                x.get('abr') or 0,
+                x.get('filesize') or 0
+            ), reverse=True)
             
             # Print list
             audio_list = []
