@@ -144,6 +144,13 @@ def download(url, format_id, output_path, is_audio):
 
     class QuietLogger:
         def debug(self, msg): pass
+        def warning(self, msg): pass
+        def error(self, msg): print(msg)
+
+    ydl_opts['logger'] = QuietLogger()
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
 
 def truncate(text, max_length=50):
     return text if len(text) <= max_length else text[:max_length - 3] + "..."
