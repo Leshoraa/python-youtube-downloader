@@ -121,11 +121,15 @@ def download(url, format_id, output_path, is_audio):
             notify_done()
 
     ydl_opts = {
-        'format': format_id,
-        'outtmpl': output_path,
-        'progress_hooks': [hook],
-        'quiet': True,
-        'no_warnings': True,
+        'format': f'{selected_format}+bestaudio/best',
+        'outtmpl': f'{title}.%(ext)s',
+        'merge_output_format': 'mp4',
+        'postprocessors': [
+            {
+                'key': 'FFmpegVideoConvertor',
+                'preferedformat': 'mp4',
+            }
+        ],
     }
 
     if not is_audio:
@@ -281,7 +285,6 @@ def list_resolutions(url, is_audio):
             f for f in formats 
             if f.get('vcodec') != 'none' and f.get('filesize')
         ]
-
 
         printed_res = set()
         sorted_video_formats = sorted(video_formats, key=lambda x: x.get('height', 0), reverse=True)
