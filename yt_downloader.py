@@ -209,129 +209,116 @@ def list_resolutions(url, is_audio):
 
     return info.get('title', 'video'), listed
 
-if __name__ == "__main__":
+def main_menu():
+    print("\n\033[95m" + "=" * 34)
+    print("       📹 YouTube Downloader       ")
+    print("=" * 34 + "\033[0m")
+    return input("\n📋 Paste URL or search video: ").strip()
+
+def choose_mode():
+    mode = input(
+        "\n🎵 Choose mode:\n\n"
+        "1. Video 🎞️\n"
+        "2. Audio 🎧\n"
+        "3. Video & Audio 🔄\n"
+        "4. Cancel ❌\n\n"
+        "➤ Choice (1/2/3/4): "
+    ).strip()
+    return mode if mode in {'1', '2', '3', '4'} else None
+
+def select_format(formats, title=""):
+    for idx, (_, label, _) in enumerate(formats, 1):
+        print(f"{idx}. {label}")
+    try:
+        choice = int(input(f"\n🎯 Select from above for '{truncate(title)}': ").strip())
+        return formats[choice - 1] if 0 < choice <= len(formats) else None
+    except:
+        return None
+
+def handle_download(raw_url, info, mode):
+    title = info.get('title', 'video')
+    safe_title = sanitize_filename(title)
+    download_dir = get_download_dir()
+    os.makedirs(download_dir, exist_ok=True)
+
+    if mode == '1':  # Video
+        title, formats = list_resolutions(raw_url, False)
+        selection = select_format(formats, title)
+        if not selection: return
+        fmt_id, label, size_mb = selection
+        output = os.path.join(download_dir, safe_title + ".mp4")
+        print(f"\n🚀 Saving to: \033[92m{output}\033[0m")
+        download(raw_url, fmt_id, output, False, "video")
+        log_download(title, label, size_mb, output)
+
+    elif mode == '2':  # Audio
+        title, formats = list_resolutions(raw_url, True)
+        selection = select_format(formats, title)
+        if not selection: return
+        fmt_id, label, size_mb = selection
+        output = os.path.join(download_dir, safe_title + ".mp3")
+        print(f"\n🚀 Saving to: \033[92m{output}\033[0m")
+        download(raw_url, fmt_id, output, True, "audio")
+        log_download(title, label, size_mb, output)
+
+    elif mode == '3':  # Video + Audio separately
+        title, v_formats = list_resolutions(raw_url, False)
+        v_selection = select_format(v_formats, title)
+        if not v_selection: return
+        v_fmt_id, v_label, v_size = v_selection
+
+        print("\n🔎 Fetching audio quality list...")
+        a_formats = [
+            (f["format_id"], f"{f['abr']}kbps - {round(f.get('filesize', 0) / 1024 / 1024, 1)} MB", f.get('filesize', 0) / 1024 / 1024)
+            for f in info["formats"]
+            if f.get('vcodec') == 'none' and f.get('acodec') != 'none' and f.get("format_id")
+        ]
+        a_selection = select_format(a_formats, title + " (audio)")
+        if not a_selection: return
+        a_fmt_id, a_label, a_size = a_selection
+
+        video_file = os.path.join(download_dir, safe_title + "_video.mp4")
+        audio_file = os.path.join(download_dir, safe_title + "_audio.mp3")
+
+        print(f"\n🚀 Downloading video to: \033[92m{video_file}\033[0m")
+        download(raw_url, v_fmt_id, video_file, False, "video")
+        log_download(title, v_label + " (video)", v_size, video_file)
+
+        print(f"\n🎧 Downloading audio to: \033[92m{audio_file}\033[0m")
+        download(raw_url, a_fmt_id, audio_file, True, "merge")
+        log_download(title, a_label + " (audio)", a_size, audio_file)
+
+def run_downloader():
     while True:
-        print("\n\033[95m" + "=" * 34)
-        print("       📹 YouTube Downloader       ")
-        print("=" * 34 + "\033[0m")
-    
-        raw = input("\n📋 Paste URL or search video: ").strip()
-        if not raw:
+        raw_input_val = main_menu()
+        if not raw_input_val:
             continue
-        if not re.match(r'^https?://', raw):
-            raw = search_video(raw)
-            if not raw:
+
+        if not re.match(r'^https?://', raw_input_val):
+            raw_input_val = search_video(raw_input_val)
+            if not raw_input_val:
                 continue
-    
-        ydl = yt_dlp.YoutubeDL({"quiet": True})
-        info = ydl.extract_info(raw, download=False)
-        thumbnail_url = info.get("thumbnail")
-        if thumbnail_url:
-            print()
-            display_ascii_thumbnail(thumbnail_url)
-        print(f"\n🎬 Title: \033[96m{info.get('title', 'Unknown')}\033[0m\n")
-    
-        mode = input(
-            "🎵 Choose mode:\n\n"
-            "1. Video 🎞️\n"
-            "2. Audio 🎧\n"
-            "3. Video & Audio 🔄\n"
-            "4. Cancel ❌\n\n"
-            "➤ Choice (1/2/3/4): "
-        ).strip()
-    
-        if mode == '4':
-            continue
-    
-        if mode not in ['1', '2', '3']:
-            print("❌ Invalid choice!")
-            continue
-    
-        is_audio = mode == '2'
-        result = list_resolutions(raw, is_audio if mode != '3' else False)
-        if not result:
-            continue
-        title, formats = result
-        if not formats:
-            continue
-    
-        choice = input("\n🎯 Select video number: ").strip()
+
         try:
-            idx = int(choice) - 1
-            selected_format_id, label, size_mb = formats[idx]
-        except:
-            print("❌ Invalid video selection!")
+            ydl = yt_dlp.YoutubeDL({"quiet": True})
+            info = ydl.extract_info(raw_input_val, download=False)
+        except Exception as e:
+            print(f"❌ Failed to extract info: {e}")
             continue
-    
-        download_dir = get_download_dir()
-        os.makedirs(download_dir, exist_ok=True)
-        safe_title = sanitize_filename(title)
-    
-        if mode == '3':
-            print("\n🔎 Fetching audio quality list...")
-            audio_formats = [f for f in info['formats'] if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
-            if not audio_formats:
-                print("❌ No audio formats available!")
-                continue
 
-            # Sort berdasarkan bitrate
-            sorted_audio = sorted(audio_formats, key=lambda x: (
-                x.get('abr') or 0,
-                x.get('filesize') or 0
-            ), reverse=True)
-            
-            # Print list
-            audio_list = []
-            printed = set()
-            print("\n🎵 Available Audio Qualities:\n")
-            for idx, fmt in enumerate(sorted_audio, 1):
-                if not fmt.get("format_id") or not fmt.get("abr"):
-                    continue
-                abr = fmt.get("abr")
-                size = fmt.get("filesize", 0) or 0
-                key = (abr, round(size / 1024 / 1024, 1)) if size else (abr, "Unknown")
-                if key in printed:
-                    continue
-                printed.add(key)
-                label = f"{abr:.0f}kbps - {key[1]} MB" if isinstance(key[1], (int, float)) else f"{abr:.0f}kbps - size unknown"
-                print(f"{idx}. {label}")
-                audio_list.append((fmt["format_id"], label, key[1] if isinstance(key[1], (int, float)) else 0))
+        if (thumb := info.get("thumbnail")):
+            display_ascii_thumbnail(thumb)
+        print(f"\n🎬 Title: \033[96m{info.get('title', 'Unknown')}\033[0m\n")
 
-            # Pilih audio
-            audio_choice = input("\n🎯 Select audio number: ").strip()
-            try:
-                audio_idx = int(audio_choice) - 1
-                audio_format_id, audio_label, audio_size = audio_list[audio_idx]
-            except:
-                print("❌ Invalid audio selection!")
-                continue
+        mode = choose_mode()
+        if not mode or mode == '4':
+            continue
 
-            # Path file
-            video_file = os.path.join(download_dir, safe_title + "_video.mp4")
-            audio_file = os.path.join(download_dir, safe_title + "_audio.mp3")
+        handle_download(raw_input_val, info, mode)
 
-            # Download
-            print(f"\n🚀 Downloading video to: \033[92m{video_file}\033[0m")
-            download(raw, selected_format_id, video_file, False, download_type="video")
-            log_download(title, label + " (video)", size_mb, video_file)
-
-            print(f"\n🎧 Downloading audio to: \033[92m{audio_file}\033[0m")
-            download(raw, audio_format_id, audio_file, True, download_type="merge")
-            log_download(title, audio_label + " (audio)", audio_size, audio_file)
-
-        elif mode == '1':
-            output_file = os.path.join(download_dir, safe_title + ".mp4")
-            print(f"\n🚀 Saving to: \033[92m{output_file}\033[0m")
-            download(raw, selected_format_id, output_file, False, download_type="video")
-            log_download(title, label, size_mb, output_file)
-    
-        elif mode == '2':
-            output_file = os.path.join(download_dir, safe_title + ".mp3")
-            print(f"\n🚀 Saving to: \033[92m{output_file}\033[0m")
-            download(raw, selected_format_id, output_file, True, download_type="audio")
-            log_download(title, label, size_mb, output_file)
-    
-        again = input("\n🔁 Download again? (y/n): ").lower().strip()
-        if again != 'y':
+        if input("\n🔁 Download again? (y/n): ").lower().strip() != 'y':
             print("\n👋 Goodbye!")
             break
+
+if __name__ == "__main__":
+    run_downloader()
