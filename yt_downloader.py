@@ -105,6 +105,7 @@ def display_ascii_thumbnail(thumbnail_url):
         print("🖼️ Thumbnail available (install jp2a or pillow for preview)")
 
 def download(url, format_id, output_path, is_audio):
+def download(url, format_id, output_path, is_audio, download_type=""):
     def hook(d):
         if d['status'] == 'downloading':
             total = d.get('total_bytes') or d.get('total_bytes_estimate', 1)
@@ -117,7 +118,14 @@ def download(url, format_id, output_path, is_audio):
             print_colored_progress_bar(percent, f"{speed_str} | ETA {eta_str}")
         elif d['status'] == 'finished':
             print_colored_progress_bar(100, "Done ✓")
-            print("\n✅ Download complete!")
+            if download_type == "audio":
+                print("\n✅ Audio download complete!")
+            elif download_type == "video":
+                print("\n✅ Video downloaded — merging with audio...")
+            elif download_type == "merge":
+                print("\n✅ Merged video & audio complete!")
+            else:
+                print("\n✅ Download complete!")
             notify_done()
 
     ydl_opts = {
@@ -419,23 +427,23 @@ if __name__ == "__main__":
 
             # Download
             print(f"\n🚀 Downloading video to: \033[92m{video_file}\033[0m")
-            download(raw, selected_format_id, video_file, False)
+            download(raw, selected_format_id, video_file, False, download_type="video")
             log_download(title, label + " (video)", size_mb, video_file)
 
             print(f"\n🎧 Downloading audio to: \033[92m{audio_file}\033[0m")
-            download(raw, audio_format_id, audio_file, True)
+            download(raw, audio_format_id, audio_file, True, download_type="merge")
             log_download(title, audio_label + " (audio)", audio_size, audio_file)
 
         elif mode == '1':
             output_file = os.path.join(download_dir, safe_title + ".mp4")
             print(f"\n🚀 Saving to: \033[92m{output_file}\033[0m")
-            download(raw, selected_format_id, output_file, False)
+            download(raw, selected_format_id, output_file, False, download_type="video")
             log_download(title, label, size_mb, output_file)
     
         elif mode == '2':
             output_file = os.path.join(download_dir, safe_title + ".mp3")
             print(f"\n🚀 Saving to: \033[92m{output_file}\033[0m")
-            download(raw, selected_format_id, output_file, True)
+            download(raw, selected_format_id, output_file, True, download_type="audio")
             log_download(title, label, size_mb, output_file)
     
         again = input("\n🔁 Download again? (y/n): ").lower().strip()
