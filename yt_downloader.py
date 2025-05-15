@@ -124,7 +124,7 @@ def download(url, format_id, output_path, is_audio):
         'outtmpl': output_path,
         'progress_hooks': [hook],
         'quiet': True,
-        'cookiesfrombrowser': ('chrome',),
+        
     }
 
     if is_audio:
