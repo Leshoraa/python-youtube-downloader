@@ -124,14 +124,14 @@ def download(url, format_id, output_path, is_audio):
         'outtmpl': output_path,
         'progress_hooks': [hook],
         'quiet': True,
+        'cookiesfrombrowser': ('chrome',),
     }
 
     if is_audio:
-        ydl_opts['format'] = 'bestaudio/best'
+        ydl_opts['format'] = format_id
         ydl_opts['postprocessors'] = [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
-            'cookiesfrombrowser': ('chrome',),
         }]
         ydl_opts['extractaudio'] = True
         ydl_opts['keepvideo'] = False
