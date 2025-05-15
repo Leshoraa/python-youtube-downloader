@@ -374,29 +374,53 @@ if __name__ == "__main__":
     
         if mode == '3':
             print("\n🔎 Fetching audio quality list...")
-            audio_formats = [f for f in info['formats'] if f.get('vcodec') == 'none' and f.get('acodec') != 'none' and f.get('filesize')]
+            audio_formats = [f for f in info['formats'] if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
             if not audio_formats:
                 print("❌ No audio formats available!")
                 continue
+
+            # Sort berdasarkan bitrate
+            sorted_audio = sorted(audio_formats, key=lambda x: (x.get('abr', 0), x.get('filesize', 0) or 0), reverse=True)
+            
+            # Print list
+            audio_list = []
+            printed = set()
+            print("\n🎵 Available Audio Qualities:\n")
+            for idx, fmt in enumerate(sorted_audio, 1):
+                if not fmt.get("format_id") or not fmt.get("abr"):
+                    continue
+                abr = fmt.get("abr")
+                size = fmt.get("filesize", 0) or 0
+                key = (abr, round(size / 1024 / 1024, 1)) if size else (abr, "Unknown")
+                if key in printed:
+                    continue
+                printed.add(key)
+                label = f"{abr:.0f}kbps - {key[1]} MB" if isinstance(key[1], (int, float)) else f"{abr:.0f}kbps - size unknown"
+                print(f"{idx}. {label}")
+                audio_list.append((fmt["format_id"], label, key[1] if isinstance(key[1], (int, float)) else 0))
+
+            # Pilih audio
             audio_choice = input("\n🎯 Select audio number: ").strip()
             try:
                 audio_idx = int(audio_choice) - 1
-                audio_format_id, audio_label, audio_size = audio_formats[audio_idx]
+                audio_format_id, audio_label, audio_size = audio_list[audio_idx]
             except:
                 print("❌ Invalid audio selection!")
                 continue
-    
+
+            # Path file
             video_file = os.path.join(download_dir, safe_title + "_video.mp4")
             audio_file = os.path.join(download_dir, safe_title + "_audio.mp3")
-    
+
+            # Download
             print(f"\n🚀 Downloading video to: \033[92m{video_file}\033[0m")
             download(raw, selected_format_id, video_file, False)
             log_download(title, label + " (video)", size_mb, video_file)
-    
+
             print(f"\n🎧 Downloading audio to: \033[92m{audio_file}\033[0m")
             download(raw, audio_format_id, audio_file, True)
             log_download(title, audio_label + " (audio)", audio_size, audio_file)
-    
+
         elif mode == '1':
             output_file = os.path.join(download_dir, safe_title + ".mp4")
             print(f"\n🚀 Saving to: \033[92m{output_file}\033[0m")
