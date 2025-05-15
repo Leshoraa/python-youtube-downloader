@@ -122,8 +122,10 @@ def download(url, format_id, output_path, is_audio):
 
     ydl_opts = {
         'format': format_id,
-        'outtmpl': f'{title}.%(ext)s',
+        'outtmpl': output_path,
         'merge_output_format': 'mp4',
+        'progress_hooks': [hook],
+        'quiet': True,
         'postprocessors': [
             {
                 'key': 'FFmpegVideoConvertor',
